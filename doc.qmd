@@ -1,0 +1,39 @@
+---
+title: "Understanding ICIOs: a practical guide"
+author: "Luis BIedma"
+format: html
+editor: source
+execute:
+  warning: false
+  message: false
+---
+
+## ICIOs
+
+ICIOs stand for Inter Country Input Output tables, so it is an extension of the relatively well known framework of Input Output tables, which serves the purpose to enrich the analysis by producing additional indicators like Trade in Value Added, calculating carbon footprints when put together with some environmental data and so on.
+
+So, a basic understanding of Input Output tables and their predecessors (supply use tables) is needed. We will build progressively our knowledge starting from the most basic concepts.
+
+## Supply tables
+
+A supply table show us by product and industry the amount of goods and services available in an economy. The goods and services available can be produced domestically (P.1) or can be imported (P.7). 
+
+A supply table shows the products in the rows and the industries in the columns. The matrix can be squared (same number of products and industries) or rectangular (more products than industries). A feature is that the diagonal will show the highest amounts as there is a relationship between products and activities. CPA_A01	Products of agriculture, hunting and related services will be mainly produced by activity A	Agriculture, forestry and fishing but other industries could produce some output of CPA_A01 as secondary activity and units classified in NACE A will produce some secondary output of other products.
+
+Let's download a supply table and illustrate it.
+
+```{r}
+library(tidyverse)
+#sut_bp<- get_eurostat("naio_10_cp15", time_format = "num") 
+sut_bp<- arrow::read_parquet("data/supply/sut_bp.parquet") 
+
+tmp<- sut_bp %>% 
+  filter(geo =="ES" & time == 2019  & unit == "MIO_EUR" &
+           str_detect(induse,"A0") & str_detect(prod_na,"CPA_A")) %>% 
+  select(induse,prod_na,values) %>% 
+  pivot_wider(names_from=induse,
+              values_from=values)
+
+knitr::kable(tmp, caption = "Spain: Domestic production of CPA_A's by activities A's, 2019")
+```
+
