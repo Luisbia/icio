@@ -10,13 +10,16 @@ execute:
 
 ## ICIOs
 
-ICIOs stand for Inter Country Input Output tables, so it is an extension of the relatively well known framework of Input Output tables, which serves the purpose to enrich the analysis by producing additional indicators like Trade in Value Added, calculating carbon footprints when put together with some environmental data and so on.
+ICIOs stand for Inter Country Input Output tables, so it is an extension of the relatively well known framework of Input Output tables. ICIOs serves the purpose to enrich the analysis by producing additional indicators like Trade in Value Added, calculating carbon footprints (when put together with some environmental data) and so on. 
 
 So, a basic understanding of Input Output tables and their predecessors (supply use tables) is needed. We will build progressively our knowledge starting from the most basic concepts.
+
+ICIOs are huge. The first released ICIO, the latest WIOD (https://www.rug.nl/ggdc/valuechain/wiod/wiod-2016-release) covering the years 2000-2014 is more than 800 zipped files as excel files and 600 as R files. A single year of data consists of thousands of rows and columns. Therefore we will use R for exploring them.
 
 ## Supply tables
 
 A supply table show us by product and industry the amount of goods and services available in an economy. The goods and services available can be produced domestically (P.1) or can be imported (P.7). 
+## Production (P.1)
 
 A supply table shows the products in the rows and the industries in the columns. The matrix can be squared (same number of products and industries) or rectangular (more products than industries). A feature is that the diagonal will show the highest amounts as there is a relationship between products and activities. CPA_A01	Products of agriculture, hunting and related services will be mainly produced by activity A	Agriculture, forestry and fishing but other industries could produce some output of CPA_A01 as secondary activity and units classified in NACE A will produce some secondary output of other products.
 
@@ -25,15 +28,94 @@ Let's download a supply table and illustrate it.
 ```{r}
 library(tidyverse)
 #sut_bp<- get_eurostat("naio_10_cp15", time_format = "num") 
-sut_bp<- arrow::read_parquet("data/supply/sut_bp.parquet") 
+sut_bp<- arrow::read_parquet("data/supply/sut_bp.parquet")
+```
 
-tmp<- sut_bp %>% 
+- Which activities produce CPA_A01 products in Spain in 2019?
+
+```{r}
+tmp<- sut_bp %>% 	
   filter(geo =="ES" & time == 2019  & unit == "MIO_EUR" &
-           str_detect(induse,"A0") & str_detect(prod_na,"CPA_A")) %>% 
+           str_detect(prod_na,"CPA_A01") & values!=0 & !str_detect(induse,"P7|D21|TS|OTTM")) %>% 
+  select(induse,prod_na,values) %>% 
+  mutate(share_induse=round(values*100/values[induse=="TOTAL"],2))
+
+knitr::kable(tmp, caption = "Spain: Domestic production of CPA_A's by activities, 2019")
+```
+
+Of the approximately EUR 50 bn domestic production of Products of agriculture, hunting and related services 99.2% are produced by NACE activity A and the remaining 0.8% by other activities.
+
+- What products the activity C29 (Manufacture of motor vehicles, trailers and semi-trailers) produced in Spain in 2019?
+
+```{r}
+tmp<- sut_bp %>% 	
+  filter(geo =="ES" & time == 2019  & unit == "MIO_EUR" &
+           str_detect(induse,"C29") & values!=0 &!str_detect(prod_na,"P11|P12|TOTADJ")) %>% 
+  select(induse,prod_na,values) %>% 
+  mutate(share_prod_na=round(values*100/values[prod_na=="TOTAL"],2)) %>% 
+  arrange(desc(share_prod_na))
+
+knitr::kable(tmp, caption = "Spain: Domestic production of products of activity C29, 2019")
+```
+
+While around 85% of the products are Motor vehicles, trailers and semi-trailers (CPA_C29) also produces other types of goods and services.
+
+## Imports (P.7)
+
+In order to calculate the total supply of a product we need to add the imported goods and services, adding and additional column to the domestically produced goods and services.
+
+We can look at the top 5 imported products.
+
+```{r}
+tmp<- sut_bp %>% 	
+  filter(geo =="ES" & time == 2019  & unit == "MIO_EUR" & induse=="P7" &
+           !str_detect(prod_na,"TOTADJ|OP_RES|ADJ_P7")) %>% 
+   select(induse,prod_na,values) %>% 
+    mutate(share_prod_na=round(values*100/values[prod_na=="TOTAL"],2)) %>% 
+  arrange(desc(share_prod_na)) %>% 
+  head(5)
+
+knitr::kable(tmp, caption = "Spain: Top 5 imported products, 2019")
+```
+
+## Breaking down imports
+
+We could go a bit further and look at the origin of the imports. For example, Eurostat requests a breakdown between EU/non-EU countries but if we would go further we could break it down to a much detail level. For example, Figaro does it for 45 countries and we will have an inter country supply table.
+
+```{r}
+tmp<- sut_bp %>% 	
+  filter(geo =="ES" & time == 2019  & unit == "MIO_EUR" & induse %in% c("P7","P7_B0", "P7_D0") &
+           prod_na=="CPA_A01") %>% 
   select(induse,prod_na,values) %>% 
   pivot_wider(names_from=induse,
-              values_from=values)
+              values_from=values) %>% 
+  rename(P7_EU = P7_B0,
+         P7_nonEU= P7_D0)
 
-knitr::kable(tmp, caption = "Spain: Domestic production of CPA_A's by activities A's, 2019")
+knitr::kable(tmp, caption = "Spain: Breakdown of imported CPA_A01 products, 2019")
+
 ```
+
+## Total supply (TS)
+
+With P.1 and P.7 we are now in a position to calculate the total supply of a product in our economy and do some analysis about our dependency in external products.
+
+```{r}
+tmp<- sut_bp %>% 	
+  filter(time == 2019  & unit == "MIO_EUR" & prod_na == "CPA_A01" & induse %in% c("TOTAL", "P7")) %>% 
+  select(geo,induse,prod_na,values) %>% 
+  pivot_wider(names_from=induse,
+              values_from=values) %>% 
+  mutate(P7_P1=round(P7*100/TOTAL,1)) %>% 
+  na.omit() %>% 
+  filter(!str_detect(geo,"EU|EA")) %>% 
+  rename(P1=TOTAL) %>% 
+  arrange(P7_P1)
+
+knitr::kable(tmp, caption = "Share of imports in production, 2019")
+```
+
+We see the ratio P7/P1 is lower in relatively poorer countries (MK, RS, EL, RO) and higher in LU (more than 100%), NL, BE and DE. 
+
+## Matrix industry by product
 

@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.353">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Luis BIedma">
+
+<title>Understanding ICIOs: a practical guide</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="doc_files/libs/clipboard/clipboard.min.js"></script>
+<script src="doc_files/libs/quarto-html/quarto.js"></script>
+<script src="doc_files/libs/quarto-html/popper.min.js"></script>
+<script src="doc_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="doc_files/libs/quarto-html/anchor.min.js"></script>
+<link href="doc_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="doc_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="doc_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="doc_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="doc_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Understanding ICIOs: a practical guide</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Luis BIedma </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="icios" class="level2">
+<h2 class="anchored" data-anchor-id="icios">ICIOs</h2>
+<p>ICIOs stand for Inter Country Input Output tables, so it is an extension of the relatively well known framework of Input Output tables. ICIOs serves the purpose to enrich the analysis by producing additional indicators like Trade in Value Added, calculating carbon footprints (when put together with some environmental data) and so on.</p>
+<p>So, a basic understanding of Input Output tables and their predecessors (supply use tables) is needed. We will build progressively our knowledge starting from the most basic concepts.</p>
+<p>ICIOs are huge. The first released ICIO, the latest WIOD (https://www.rug.nl/ggdc/valuechain/wiod/wiod-2016-release) covering the years 2000-2014 is more than 800 zipped files as excel files and 600 as R files. A single year of data consists of thousands of rows and columns. Therefore we will use R for exploring them.</p>
+</section>
+<section id="supply-tables" class="level2">
+<h2 class="anchored" data-anchor-id="supply-tables">Supply tables</h2>
+<p>A supply table show us by product and industry the amount of goods and services available in an economy. The goods and services available can be produced domestically (P.1) or can be imported (P.7). ## Production (P.1)</p>
+<p>A supply table shows the products in the rows and the industries in the columns. The matrix can be squared (same number of products and industries) or rectangular (more products than industries). A feature is that the diagonal will show the highest amounts as there is a relationship between products and activities. CPA_A01 Products of agriculture, hunting and related services will be mainly produced by activity A Agriculture, forestry and fishing but other industries could produce some output of CPA_A01 as secondary activity and units classified in NACE A will produce some secondary output of other products.</p>
+<p>Let’s download a supply table and illustrate it.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">#sut_bp&lt;- get_eurostat("naio_10_cp15", time_format = "num") </span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>sut_bp<span class="ot">&lt;-</span> arrow<span class="sc">::</span><span class="fu">read_parquet</span>(<span class="st">"data/supply/sut_bp.parquet"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<ul>
+<li>Which activities produce CPA_A01 products in Spain in 2019?</li>
+</ul>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tmp<span class="ot">&lt;-</span> sut_bp <span class="sc">%&gt;%</span>    </span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(geo <span class="sc">==</span><span class="st">"ES"</span> <span class="sc">&amp;</span> time <span class="sc">==</span> <span class="dv">2019</span>  <span class="sc">&amp;</span> unit <span class="sc">==</span> <span class="st">"MIO_EUR"</span> <span class="sc">&amp;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>           <span class="fu">str_detect</span>(prod_na,<span class="st">"CPA_A01"</span>) <span class="sc">&amp;</span> values<span class="sc">!=</span><span class="dv">0</span> <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">str_detect</span>(induse,<span class="st">"P7|D21|TS|OTTM"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(induse,prod_na,values) <span class="sc">%&gt;%</span> </span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">share_induse=</span><span class="fu">round</span>(values<span class="sc">*</span><span class="dv">100</span><span class="sc">/</span>values[induse<span class="sc">==</span><span class="st">"TOTAL"</span>],<span class="dv">2</span>))</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(tmp, <span class="at">caption =</span> <span class="st">"Spain: Domestic production of CPA_A's by activities, 2019"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<caption>Spain: Domestic production of CPA_A’s by activities, 2019</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">induse</th>
+<th style="text-align: left;">prod_na</th>
+<th style="text-align: right;">values</th>
+<th style="text-align: right;">share_induse</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">A01</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">49353.6</td>
+<td style="text-align: right;">99.21</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">A02</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">0.6</td>
+<td style="text-align: right;">0.00</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">F</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">80.8</td>
+<td style="text-align: right;">0.16</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">G46</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">238.7</td>
+<td style="text-align: right;">0.48</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">G47</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">13.7</td>
+<td style="text-align: right;">0.03</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">H49</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">0.6</td>
+<td style="text-align: right;">0.00</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">N79</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">8.2</td>
+<td style="text-align: right;">0.02</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">N80-82</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">35.3</td>
+<td style="text-align: right;">0.07</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">O</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">13.0</td>
+<td style="text-align: right;">0.03</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">TOTAL</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">49744.5</td>
+<td style="text-align: right;">100.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Of the approximately EUR 50 bn domestic production of Products of agriculture, hunting and related services 99.2% are produced by NACE activity A and the remaining 0.8% by other activities.</p>
+<ul>
+<li>What products the activity C29 (Manufacture of motor vehicles, trailers and semi-trailers) produced in Spain in 2019?</li>
+</ul>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>tmp<span class="ot">&lt;-</span> sut_bp <span class="sc">%&gt;%</span>    </span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(geo <span class="sc">==</span><span class="st">"ES"</span> <span class="sc">&amp;</span> time <span class="sc">==</span> <span class="dv">2019</span>  <span class="sc">&amp;</span> unit <span class="sc">==</span> <span class="st">"MIO_EUR"</span> <span class="sc">&amp;</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>           <span class="fu">str_detect</span>(induse,<span class="st">"C29"</span>) <span class="sc">&amp;</span> values<span class="sc">!=</span><span class="dv">0</span> <span class="sc">&amp;!</span><span class="fu">str_detect</span>(prod_na,<span class="st">"P11|P12|TOTADJ"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(induse,prod_na,values) <span class="sc">%&gt;%</span> </span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">share_prod_na=</span><span class="fu">round</span>(values<span class="sc">*</span><span class="dv">100</span><span class="sc">/</span>values[prod_na<span class="sc">==</span><span class="st">"TOTAL"</span>],<span class="dv">2</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(share_prod_na))</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(tmp, <span class="at">caption =</span> <span class="st">"Spain: Domestic production of products of activity C29, 2019"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<caption>Spain: Domestic production of products of activity C29, 2019</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">induse</th>
+<th style="text-align: left;">prod_na</th>
+<th style="text-align: right;">values</th>
+<th style="text-align: right;">share_prod_na</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">TOTAL</td>
+<td style="text-align: right;">68756.0</td>
+<td style="text-align: right;">100.00</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C29</td>
+<td style="text-align: right;">58071.1</td>
+<td style="text-align: right;">84.46</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_N80-82</td>
+<td style="text-align: right;">2450.8</td>
+<td style="text-align: right;">3.56</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C28</td>
+<td style="text-align: right;">1518.0</td>
+<td style="text-align: right;">2.21</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C25</td>
+<td style="text-align: right;">1333.8</td>
+<td style="text-align: right;">1.94</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_P</td>
+<td style="text-align: right;">1034.7</td>
+<td style="text-align: right;">1.50</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_M74_75</td>
+<td style="text-align: right;">987.1</td>
+<td style="text-align: right;">1.44</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C22</td>
+<td style="text-align: right;">918.8</td>
+<td style="text-align: right;">1.34</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_G46</td>
+<td style="text-align: right;">859.0</td>
+<td style="text-align: right;">1.25</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_M72</td>
+<td style="text-align: right;">510.0</td>
+<td style="text-align: right;">0.74</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C24</td>
+<td style="text-align: right;">355.5</td>
+<td style="text-align: right;">0.52</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C27</td>
+<td style="text-align: right;">251.8</td>
+<td style="text-align: right;">0.37</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C33</td>
+<td style="text-align: right;">182.8</td>
+<td style="text-align: right;">0.27</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C30</td>
+<td style="text-align: right;">72.6</td>
+<td style="text-align: right;">0.11</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C23</td>
+<td style="text-align: right;">44.7</td>
+<td style="text-align: right;">0.07</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_L68B</td>
+<td style="text-align: right;">43.1</td>
+<td style="text-align: right;">0.06</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_N77</td>
+<td style="text-align: right;">42.2</td>
+<td style="text-align: right;">0.06</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C26</td>
+<td style="text-align: right;">33.2</td>
+<td style="text-align: right;">0.05</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_J62_63</td>
+<td style="text-align: right;">21.0</td>
+<td style="text-align: right;">0.03</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C13-15</td>
+<td style="text-align: right;">10.8</td>
+<td style="text-align: right;">0.02</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_D</td>
+<td style="text-align: right;">9.5</td>
+<td style="text-align: right;">0.01</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_F</td>
+<td style="text-align: right;">5.0</td>
+<td style="text-align: right;">0.01</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C29</td>
+<td style="text-align: left;">CPA_C31_32</td>
+<td style="text-align: right;">0.5</td>
+<td style="text-align: right;">0.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>While around 85% of the products are Motor vehicles, trailers and semi-trailers (CPA_C29) also produces other types of goods and services.</p>
+</section>
+<section id="imports-p.7" class="level2">
+<h2 class="anchored" data-anchor-id="imports-p.7">Imports (P.7)</h2>
+<p>In order to calculate the total supply of a product we need to add the imported goods and services, adding and additional column to the domestically produced goods and services.</p>
+<p>We can look at the top 5 imported products.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>tmp<span class="ot">&lt;-</span> sut_bp <span class="sc">%&gt;%</span>    </span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(geo <span class="sc">==</span><span class="st">"ES"</span> <span class="sc">&amp;</span> time <span class="sc">==</span> <span class="dv">2019</span>  <span class="sc">&amp;</span> unit <span class="sc">==</span> <span class="st">"MIO_EUR"</span> <span class="sc">&amp;</span> induse<span class="sc">==</span><span class="st">"P7"</span> <span class="sc">&amp;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>           <span class="sc">!</span><span class="fu">str_detect</span>(prod_na,<span class="st">"TOTADJ|OP_RES|ADJ_P7"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>   <span class="fu">select</span>(induse,prod_na,values) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">share_prod_na=</span><span class="fu">round</span>(values<span class="sc">*</span><span class="dv">100</span><span class="sc">/</span>values[prod_na<span class="sc">==</span><span class="st">"TOTAL"</span>],<span class="dv">2</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(share_prod_na)) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>(<span class="dv">5</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(tmp, <span class="at">caption =</span> <span class="st">"Spain: Top 5 imported products, 2019"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<caption>Spain: Top 5 imported products, 2019</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">induse</th>
+<th style="text-align: left;">prod_na</th>
+<th style="text-align: right;">values</th>
+<th style="text-align: right;">share_prod_na</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">P7</td>
+<td style="text-align: left;">TOTAL</td>
+<td style="text-align: right;">381506.0</td>
+<td style="text-align: right;">100.00</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">P7</td>
+<td style="text-align: left;">CPA_C29</td>
+<td style="text-align: right;">44558.6</td>
+<td style="text-align: right;">11.68</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">P7</td>
+<td style="text-align: left;">CPA_B</td>
+<td style="text-align: right;">38974.6</td>
+<td style="text-align: right;">10.22</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">P7</td>
+<td style="text-align: left;">CPA_C13-15</td>
+<td style="text-align: right;">28594.2</td>
+<td style="text-align: right;">7.50</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">P7</td>
+<td style="text-align: left;">CPA_C20</td>
+<td style="text-align: right;">28324.8</td>
+<td style="text-align: right;">7.42</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="breaking-down-imports" class="level2">
+<h2 class="anchored" data-anchor-id="breaking-down-imports">Breaking down imports</h2>
+<p>We could go a bit further and look at the origin of the imports. For example, Eurostat requests a breakdown between EU/non-EU countries but if we would go further we could break it down to a much detail level. For example, Figaro does it for 45 countries and we will have an inter country supply table.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>tmp<span class="ot">&lt;-</span> sut_bp <span class="sc">%&gt;%</span>    </span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(geo <span class="sc">==</span><span class="st">"ES"</span> <span class="sc">&amp;</span> time <span class="sc">==</span> <span class="dv">2019</span>  <span class="sc">&amp;</span> unit <span class="sc">==</span> <span class="st">"MIO_EUR"</span> <span class="sc">&amp;</span> induse <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"P7"</span>,<span class="st">"P7_B0"</span>, <span class="st">"P7_D0"</span>) <span class="sc">&amp;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>           prod_na<span class="sc">==</span><span class="st">"CPA_A01"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(induse,prod_na,values) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from=</span>induse,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>              <span class="at">values_from=</span>values) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">P7_EU =</span> P7_B0,</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>         <span class="at">P7_nonEU=</span> P7_D0)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(tmp, <span class="at">caption =</span> <span class="st">"Spain: Breakdown of imported CPA_A01 products, 2019"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<caption>Spain: Breakdown of imported CPA_A01 products, 2019</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">prod_na</th>
+<th style="text-align: right;">P7</th>
+<th style="text-align: right;">P7_EU</th>
+<th style="text-align: right;">P7_nonEU</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">10630.9</td>
+<td style="text-align: right;">4236.6</td>
+<td style="text-align: right;">6394.3</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="total-supply-ts" class="level2">
+<h2 class="anchored" data-anchor-id="total-supply-ts">Total supply (TS)</h2>
+<p>With P.1 and P.7 we are now in a position to calculate the total supply of a product in our economy and do some analysis about our dependency in external products.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>tmp<span class="ot">&lt;-</span> sut_bp <span class="sc">%&gt;%</span>    </span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(time <span class="sc">==</span> <span class="dv">2019</span>  <span class="sc">&amp;</span> unit <span class="sc">==</span> <span class="st">"MIO_EUR"</span> <span class="sc">&amp;</span> prod_na <span class="sc">==</span> <span class="st">"CPA_A01"</span> <span class="sc">&amp;</span> induse <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"TOTAL"</span>, <span class="st">"P7"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(geo,induse,prod_na,values) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from=</span>induse,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>              <span class="at">values_from=</span>values) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">P7_P1=</span><span class="fu">round</span>(P7<span class="sc">*</span><span class="dv">100</span><span class="sc">/</span>TOTAL,<span class="dv">1</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">na.omit</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">str_detect</span>(geo,<span class="st">"EU|EA"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">P1=</span>TOTAL) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(P7_P1)</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(tmp, <span class="at">caption =</span> <span class="st">"Share of imports in production, 2019"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<caption>Share of imports in production, 2019</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">geo</th>
+<th style="text-align: left;">prod_na</th>
+<th style="text-align: right;">P7</th>
+<th style="text-align: right;">P1</th>
+<th style="text-align: right;">P7_P1</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">MK</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">131.00</td>
+<td style="text-align: right;">1386.01</td>
+<td style="text-align: right;">9.5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">RS</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">641.06</td>
+<td style="text-align: right;">4830.61</td>
+<td style="text-align: right;">13.3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">EL</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">1723.11</td>
+<td style="text-align: right;">10839.05</td>
+<td style="text-align: right;">15.9</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">RO</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">2609.32</td>
+<td style="text-align: right;">16395.49</td>
+<td style="text-align: right;">15.9</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">HU</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">1583.93</td>
+<td style="text-align: right;">9120.68</td>
+<td style="text-align: right;">17.4</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">FR</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">12597.00</td>
+<td style="text-align: right;">70999.00</td>
+<td style="text-align: right;">17.7</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">PL</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">5410.56</td>
+<td style="text-align: right;">28747.16</td>
+<td style="text-align: right;">18.8</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ES</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">10630.90</td>
+<td style="text-align: right;">49744.50</td>
+<td style="text-align: right;">21.4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">CZ</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">2216.59</td>
+<td style="text-align: right;">9183.03</td>
+<td style="text-align: right;">24.1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">FI</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">1119.16</td>
+<td style="text-align: right;">4559.25</td>
+<td style="text-align: right;">24.5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">LT</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">705.21</td>
+<td style="text-align: right;">2870.27</td>
+<td style="text-align: right;">24.6</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">IT</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">13840.00</td>
+<td style="text-align: right;">52554.90</td>
+<td style="text-align: right;">26.3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">CY</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">202.32</td>
+<td style="text-align: right;">715.05</td>
+<td style="text-align: right;">28.3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">DK</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">2496.57</td>
+<td style="text-align: right;">8349.10</td>
+<td style="text-align: right;">29.9</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">EE</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">295.12</td>
+<td style="text-align: right;">973.23</td>
+<td style="text-align: right;">30.3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HR</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">682.09</td>
+<td style="text-align: right;">2206.04</td>
+<td style="text-align: right;">30.9</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">LV</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">559.65</td>
+<td style="text-align: right;">1672.93</td>
+<td style="text-align: right;">33.5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SE</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">2421.53</td>
+<td style="text-align: right;">6579.14</td>
+<td style="text-align: right;">36.8</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SK</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">1077.35</td>
+<td style="text-align: right;">2803.34</td>
+<td style="text-align: right;">38.4</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">PT</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">3110.33</td>
+<td style="text-align: right;">7127.58</td>
+<td style="text-align: right;">43.6</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">NO</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">1741.94</td>
+<td style="text-align: right;">3831.55</td>
+<td style="text-align: right;">45.5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">AT</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">3074.04</td>
+<td style="text-align: right;">6453.48</td>
+<td style="text-align: right;">47.6</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SI</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">594.64</td>
+<td style="text-align: right;">1054.29</td>
+<td style="text-align: right;">56.4</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">DE</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">33369.00</td>
+<td style="text-align: right;">53084.00</td>
+<td style="text-align: right;">62.9</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">BE</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">7891.30</td>
+<td style="text-align: right;">10309.50</td>
+<td style="text-align: right;">76.5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">NL</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">22882.00</td>
+<td style="text-align: right;">29426.00</td>
+<td style="text-align: right;">77.8</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">LU</td>
+<td style="text-align: left;">CPA_A01</td>
+<td style="text-align: right;">616.77</td>
+<td style="text-align: right;">475.69</td>
+<td style="text-align: right;">129.7</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>We see the ratio P7/P1 is lower in relatively poorer countries (MK, RS, EL, RO) and higher in LU (more than 100%), NL, BE and DE.</p>
+</section>
+<section id="matrix-industry-by-product" class="level2">
+<h2 class="anchored" data-anchor-id="matrix-industry-by-product">Matrix industry by product</h2>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
