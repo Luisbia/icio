@@ -6,6 +6,7 @@ editor: source
 execute:
   warning: false
   message: false
+self-contained: true
 ---
 
 ## ICIOs
